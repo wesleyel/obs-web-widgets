@@ -767,7 +767,7 @@ AMLL_PLAYER_HTML = """<!doctype html>
     :root {
       color-scheme: dark;
       background: transparent;
-      --amll-lp-color: #b9e7ff;
+      --amll-lp-color: #d8f4ff;
       --amll-lp-font-size: clamp(24px, 3.5vw, 58px);
     }
     html,
@@ -776,7 +776,7 @@ AMLL_PLAYER_HTML = """<!doctype html>
       height: 100%;
       margin: 0;
       overflow: hidden;
-      background: rgba(0, 0, 0, 0.32);
+      background: rgba(8, 12, 18, 0.38);
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Noto Sans CJK SC", sans-serif;
@@ -795,6 +795,32 @@ AMLL_PLAYER_HTML = """<!doctype html>
       text-shadow:
         0 2px 4px rgba(0, 0, 0, 0.9),
         0 8px 22px rgba(0, 0, 0, 0.72);
+    }
+    #player :is(.KxF9Iq_lyricLine, .FmKaba_lyricLine) {
+      color: rgba(188, 222, 238, 0.86);
+      filter: none !important;
+      text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.92),
+        0 3px 10px rgba(0, 0, 0, 0.82),
+        0 0 14px rgba(132, 205, 238, 0.18);
+    }
+    #player :is(.KxF9Iq_lyricLine, .FmKaba_lyricLine):not(:is(.KxF9Iq_active, .FmKaba_active, .KxF9Iq_dirty, .FmKaba_dirty)) {
+      opacity: 0.74 !important;
+    }
+    #player :is(.KxF9Iq_active, .FmKaba_active) {
+      color: #e8f9ff;
+      opacity: 1 !important;
+      text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.95),
+        0 4px 14px rgba(0, 0, 0, 0.86),
+        0 0 20px rgba(130, 214, 255, 0.34);
+    }
+    #player :is(.KxF9Iq_lyricSubLine, .FmKaba_lyricSubLine) {
+      color: rgba(177, 215, 232, 0.82);
+      opacity: 0.78;
+      text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.92),
+        0 2px 8px rgba(0, 0, 0, 0.82);
     }
     #player > * {
       width: 100%;
