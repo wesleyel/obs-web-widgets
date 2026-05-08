@@ -14,7 +14,18 @@ uv run python server.py
 
 服务会直接调用系统 `swift now_playing.swift` 读取 Now Playing。这里刻意不编译成自定义二进制，因为当前 macOS 上自定义 `swiftc` 二进制读取 `MediaRemote.framework` 会返回空数据，而 Apple 自带 `swift` 解释执行可以正常返回网易云播放信息。
 
+当前目录也提供了一个临时 LaunchAgent：
+
+```bash
+launchctl bootstrap gui/$(id -u) ./local.webendpoint.obs.amll.plist
+launchctl bootout gui/$(id -u) ./local.webendpoint.obs.amll.plist
+```
+
+日志写到 `/tmp/webendpoint-obs.log`。
+
 ## OBS 设置
+
+旧版简单 overlay：
 
 在 OBS 里添加：
 
@@ -22,6 +33,14 @@ uv run python server.py
 - URL：`http://127.0.0.1:17363/`
 - Width：`1920`
 - Height：`360`
+- 背景：页面本身是透明背景
+
+AMLL 滚动歌词 overlay：
+
+- 来源类型：Browser
+- URL：`http://127.0.0.1:17364/`
+- Width：`1920`
+- Height：`1080`
 - 背景：页面本身是透明背景
 
 如果你只想调试接口：
@@ -39,6 +58,7 @@ curl http://127.0.0.1:17363/amll/manifest.json
 curl http://127.0.0.1:17363/amll/lyrics.lrc
 curl http://127.0.0.1:17363/amll/lyrics.ttml
 curl http://127.0.0.1:17363/amll/lyrics.yrc
+curl http://127.0.0.1:17363/amll/lines.json
 curl http://127.0.0.1:17363/amll/translation.lrc
 curl http://127.0.0.1:17363/amll/roman.lrc
 ```
@@ -47,12 +67,14 @@ curl http://127.0.0.1:17363/amll/roman.lrc
 - `lyrics.lrc`：AMLL 支持的普通 LRC，保留网易云原始 LRC 并补 `ti/ar/al/length/netease` 元数据。
 - `lyrics.ttml`：按 AMLL TTML 约定生成的行级 TTML，`itunes:timing="Line"`。
 - `lyrics.yrc`：网易云返回 YRC 逐字歌词时才可用；当前歌曲没有 YRC 时返回 404。
+- `lines.json`：AMLL core `LyricPlayer.setLyricLines()` 可直接消费的 `LyricLine[]`。
 - `translation.lrc` / `roman.lrc`：网易云返回翻译或音译时才可用；TTML 会自动把这些挂到 `x-translation` / `x-roman`。
 
 ## 可调环境变量
 
 ```bash
 OBS_LYRICS_PORT=17363 uv run python server.py
+AMLL_PLAYER_PORT=17364 uv run python server.py
 OBS_LYRICS_OFFSET=0.3 uv run python server.py
 OBS_LYRICS_SOURCE_BUNDLE=com.netease.163music uv run python server.py
 ```
@@ -64,5 +86,7 @@ OBS_LYRICS_SOURCE_BUNDLE=com.netease.163music uv run python server.py
 
 - 这套方案只支持 macOS，因为当前播放信息来自 macOS 私有 `MediaRemote.framework`。
 - 不接 obs-websocket；OBS 端只需要 Browser Source。
+- 服务会同时监听两个端口：`17363` 保留简单 overlay/API，`17364` 展示 AMLL Player 滚动歌词。
 - 网易云歌词接口是非官方接口，接口变更或版权限制时可能只能显示“暂无歌词”。
 - AMLL 的 TTML 适配是行级 TTML；只有网易云接口实际返回 YRC 时才会提供逐字歌词。
+- AMLL Player 页面从 `esm.sh` 加载 `@applemusic-like-lyrics/core@0.4.2`，OBS Browser Source 需要能访问该 CDN。

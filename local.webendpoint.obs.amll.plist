@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>local.webendpoint.obs.amll</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/uv</string>
+    <string>run</string>
+    <string>python</string>
+    <string>server.py</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/wesley/Documents/Codex/2026-05-08/webendpoint-obs</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/wesley</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/tmp/webendpoint-obs.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/webendpoint-obs.log</string>
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>
