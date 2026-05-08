@@ -182,6 +182,15 @@ def lyric_field(payload: dict[str, Any], key: str) -> str:
     return ""
 
 
+def looks_like_netease_yrc(raw: str) -> bool:
+    return bool(re.search(r"(?m)^\[\d+,\d+]\(\d+,\d+,0\)", raw))
+
+
+def clean_netease_yrc(raw: str) -> str:
+    lines = [line for line in raw.splitlines() if re.match(r"^\[\d+,\d+]", line)]
+    return "\n".join(lines)
+
+
 def fetch_lyrics(song_id: int) -> LyricBundle:
     legacy_payload = http_json(
         NETEASE_LYRIC,
@@ -210,7 +219,8 @@ def fetch_lyrics(song_id: int) -> LyricBundle:
     except Exception:
         v1_payload = {}
     raw_lrc = lyric_field(legacy_payload, "lrc")
-    raw_yrc = lyric_field(v1_payload, "yrc")
+    raw_yrc_candidate = lyric_field(v1_payload, "yrc")
+    raw_yrc = clean_netease_yrc(raw_yrc_candidate) if looks_like_netease_yrc(raw_yrc_candidate) else ""
     raw_translation_lrc = lyric_field(legacy_payload, "tlyric") or lyric_field(v1_payload, "tlyric")
     raw_roman_lrc = lyric_field(v1_payload, "romalrc")
     parsed = parse_lrc(raw_lrc)
