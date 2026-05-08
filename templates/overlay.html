@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NetEase Lyrics Overlay</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+      background: transparent;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.32);
+    }
+    body {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .overlay {
+      width: min(92vw, 1680px);
+      padding: 0 36px 54px;
+      box-sizing: border-box;
+      text-align: center;
+      color: #b9e7ff;
+      text-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.9),
+        0 6px 18px rgba(0, 0, 0, 0.72);
+    }
+    .track {
+      margin-bottom: 16px;
+      font-size: clamp(20px, 2.1vw, 34px);
+      font-weight: 650;
+      line-height: 1.18;
+      opacity: 0.92;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .current {
+      min-height: 1.32em;
+      font-size: clamp(38px, 5.4vw, 86px);
+      font-weight: 760;
+      line-height: 1.14;
+      letter-spacing: 0;
+      overflow-wrap: anywhere;
+    }
+    .next {
+      min-height: 1.22em;
+      margin-top: 16px;
+      font-size: clamp(24px, 2.8vw, 44px);
+      font-weight: 560;
+      line-height: 1.18;
+      opacity: 0.58;
+      overflow-wrap: anywhere;
+    }
+    .dim {
+      opacity: 0.55;
+    }
+  </style>
+</head>
+<body>
+  <main class="overlay">
+    <div id="track" class="track dim">等待网易云音乐播放</div>
+    <div id="current" class="current">等待歌词</div>
+    <div id="next" class="next"></div>
+  </main>
+  <script>
+    const track = document.getElementById("track");
+    const current = document.getElementById("current");
+    const next = document.getElementById("next");
+
+    function setText(node, value) {
+      node.textContent = value || "";
+    }
+
+    function render(state) {
+      const title = state.track?.title || "";
+      const artist = state.track?.artist || "";
+      const trackText = [title, artist].filter(Boolean).join(" - ");
+      setText(track, trackText || state.message || "等待网易云音乐播放");
+      track.classList.toggle("dim", !trackText);
+      setText(current, state.lyric?.current || state.message || "等待歌词");
+      setText(next, state.lyric?.next || "");
+    }
+
+    const events = new EventSource("/events");
+    events.onmessage = event => render(JSON.parse(event.data));
+    events.onerror = () => {
+      setText(track, "连接本地歌词服务失败");
+      setText(current, "检查 server.py 是否仍在运行");
+      setText(next, "");
+    };
+  </script>
+</body>
+</html>

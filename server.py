@@ -20,6 +20,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from jinja2 import Environment, FileSystemLoader
+
 try:
     from config import COUNTDOWN_NAME, COUNTDOWN_TARGET
 except ImportError:
@@ -28,12 +30,12 @@ except ImportError:
 
 
 ROOT = Path(__file__).resolve().parent
+TEMPLATES = Environment(loader=FileSystemLoader(ROOT / "templates"))
 NOW_PLAYING_SWIFT = ROOT / "now_playing.swift"
 NOW_PLAYING_COMMAND = os.environ.get("NOW_PLAYING_COMMAND", "")
 
 HOST = os.environ.get("OBS_LYRICS_HOST", "127.0.0.1")
 PORT = int(os.environ.get("OBS_LYRICS_PORT", "17363"))
-AMLL_PLAYER_PORT = int(os.environ.get("AMLL_PLAYER_PORT", "17364"))
 SOURCE_BUNDLE = os.environ.get("OBS_LYRICS_SOURCE_BUNDLE", "com.netease.163music")
 POLL_INTERVAL = float(os.environ.get("OBS_LYRICS_POLL_INTERVAL", "0.6"))
 LYRIC_OFFSET = float(os.environ.get("OBS_LYRICS_OFFSET", "0"))
@@ -714,532 +716,6 @@ def poll_now_playing() -> None:
         time.sleep(POLL_INTERVAL)
 
 
-OVERLAY_HTML = """<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NetEase Lyrics Overlay</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Noto Sans CJK SC", sans-serif;
-      background: transparent;
-    }
-    html, body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      overflow: hidden;
-      background: rgba(0, 0, 0, 0.32);
-    }
-    body {
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-    }
-    .overlay {
-      width: min(92vw, 1680px);
-      padding: 0 36px 54px;
-      box-sizing: border-box;
-      text-align: center;
-      color: #b9e7ff;
-      text-shadow:
-        0 2px 4px rgba(0, 0, 0, 0.9),
-        0 6px 18px rgba(0, 0, 0, 0.72);
-    }
-    .track {
-      margin-bottom: 16px;
-      font-size: clamp(20px, 2.1vw, 34px);
-      font-weight: 650;
-      line-height: 1.18;
-      opacity: 0.92;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .current {
-      min-height: 1.32em;
-      font-size: clamp(38px, 5.4vw, 86px);
-      font-weight: 760;
-      line-height: 1.14;
-      letter-spacing: 0;
-      overflow-wrap: anywhere;
-    }
-    .next {
-      min-height: 1.22em;
-      margin-top: 16px;
-      font-size: clamp(24px, 2.8vw, 44px);
-      font-weight: 560;
-      line-height: 1.18;
-      opacity: 0.58;
-      overflow-wrap: anywhere;
-    }
-    .dim {
-      opacity: 0.55;
-    }
-  </style>
-</head>
-<body>
-  <main class="overlay">
-    <div id="track" class="track dim">等待网易云音乐播放</div>
-    <div id="current" class="current">等待歌词</div>
-    <div id="next" class="next"></div>
-  </main>
-  <script>
-    const track = document.getElementById("track");
-    const current = document.getElementById("current");
-    const next = document.getElementById("next");
-
-    function setText(node, value) {
-      node.textContent = value || "";
-    }
-
-    function render(state) {
-      const title = state.track?.title || "";
-      const artist = state.track?.artist || "";
-      const trackText = [title, artist].filter(Boolean).join(" - ");
-      setText(track, trackText || state.message || "等待网易云音乐播放");
-      track.classList.toggle("dim", !trackText);
-      setText(current, state.lyric?.current || state.message || "等待歌词");
-      setText(next, state.lyric?.next || "");
-    }
-
-    const events = new EventSource("/events");
-    events.onmessage = event => render(JSON.parse(event.data));
-    events.onerror = () => {
-      setText(track, "连接本地歌词服务失败");
-      setText(current, "检查 server.py 是否仍在运行");
-      setText(next, "");
-    };
-  </script>
-</body>
-</html>
-"""
-
-
-AMLL_PLAYER_HTML = """<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AMLL NetEase Lyrics</title>
-  <link rel="stylesheet" href="https://esm.sh/@applemusic-like-lyrics/core@0.4.2/style.css">
-  <style>
-    :root {
-      color-scheme: dark;
-      background: transparent;
-      --amll-lp-color: #d8f4ff;
-      --amll-lp-font-size: clamp(24px, 3.5vw, 58px);
-    }
-    html,
-    body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      overflow: hidden;
-      background: rgba(8, 12, 18, 0.38);
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Noto Sans CJK SC", sans-serif;
-    }
-    #root {
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      position: relative;
-    }
-    #player {
-      position: absolute;
-      inset: 0;
-      padding: 4vh 5vw 6vh;
-      box-sizing: border-box;
-      text-shadow:
-        0 2px 4px rgba(0, 0, 0, 0.9),
-        0 8px 22px rgba(0, 0, 0, 0.72);
-    }
-    #player :is(.KxF9Iq_lyricLine, .FmKaba_lyricLine) {
-      color: rgba(188, 222, 238, 0.86);
-      filter: none !important;
-      text-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.92),
-        0 3px 10px rgba(0, 0, 0, 0.82),
-        0 0 14px rgba(132, 205, 238, 0.18);
-    }
-    #player :is(.KxF9Iq_lyricLine, .FmKaba_lyricLine):not(:is(.KxF9Iq_active, .FmKaba_active, .KxF9Iq_dirty, .FmKaba_dirty)) {
-      opacity: 0.74 !important;
-    }
-    #player :is(.KxF9Iq_active, .FmKaba_active) {
-      color: #e8f9ff;
-      opacity: 1 !important;
-      text-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.95),
-        0 4px 14px rgba(0, 0, 0, 0.86),
-        0 0 20px rgba(130, 214, 255, 0.34);
-    }
-    #player :is(.KxF9Iq_lyricSubLine, .FmKaba_lyricSubLine) {
-      color: rgba(177, 215, 232, 0.82);
-      opacity: 0.78;
-      text-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.92),
-        0 2px 8px rgba(0, 0, 0, 0.82);
-    }
-    #player > * {
-      width: 100%;
-      height: 100%;
-    }
-    #status {
-      position: absolute;
-      left: 5vw;
-      right: 5vw;
-      bottom: 4vh;
-      color: #b9e7ff;
-      font-size: clamp(18px, 2.3vw, 34px);
-      font-weight: 650;
-      text-shadow:
-        0 2px 4px rgba(0, 0, 0, 0.9),
-        0 8px 22px rgba(0, 0, 0, 0.72);
-      opacity: 0.8;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      pointer-events: none;
-    }
-    body.ready #status {
-      opacity: 0.42;
-    }
-  </style>
-</head>
-<body>
-  <main id="root">
-    <div id="player"></div>
-    <div id="status">正在加载 AMLL Player</div>
-  </main>
-  <script type="module">
-    import { LyricPlayer } from "https://esm.sh/@applemusic-like-lyrics/core@0.4.2?bundle";
-
-    const mount = document.getElementById("player");
-    const status = document.getElementById("status");
-    const player = new LyricPlayer();
-    mount.appendChild(player.getElement());
-
-    let loadedKey = "";
-    let baseElapsedMs = 0;
-    let basePerfMs = performance.now();
-    let playbackRate = 0;
-    let lastFrameMs = performance.now();
-
-    function currentTimeMs() {
-      return baseElapsedMs + (performance.now() - basePerfMs) * playbackRate;
-    }
-
-    function trackKey(state) {
-      const track = state.track || {};
-      if (!state.neteaseSongID && !track.title) {
-        return "";
-      }
-      return [
-        state.neteaseSongID || "",
-        track.title || "",
-        track.artist || "",
-        Math.round(track.duration || 0),
-      ].join("|");
-    }
-
-    function setStatus(text) {
-      status.textContent = text || "";
-    }
-
-    async function loadLines(key) {
-      const response = await fetch("/amll/lines.json", { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      const payload = await response.json();
-      player.setLyricLines(payload.lines || [], currentTimeMs());
-      loadedKey = key;
-      document.body.classList.toggle("ready", (payload.lines || []).length > 0);
-      setStatus(payload.track?.title ? `${payload.track.title} - ${payload.track.artist || ""}` : payload.message);
-    }
-
-    function applyState(state) {
-      const track = state.track || {};
-      baseElapsedMs = Math.max(0, (track.elapsed || 0) * 1000);
-      basePerfMs = performance.now();
-      playbackRate = track.playbackRate || 0;
-
-      const key = trackKey(state);
-      if (key && key !== loadedKey) {
-        loadLines(key).catch(error => {
-          console.error(error);
-          setStatus("AMLL 歌词加载失败");
-          document.body.classList.remove("ready");
-        });
-      } else if (!key) {
-        player.setLyricLines([], 0);
-        loadedKey = "";
-        setStatus(state.message || "等待网易云音乐播放");
-        document.body.classList.remove("ready");
-      }
-    }
-
-    function frame(now) {
-      const delta = now - lastFrameMs;
-      lastFrameMs = now;
-      player.setCurrentTime(currentTimeMs());
-      player.update(delta);
-      requestAnimationFrame(frame);
-    }
-
-    const events = new EventSource("/events");
-    events.onmessage = event => applyState(JSON.parse(event.data));
-    events.onerror = () => {
-      setStatus("连接本地歌词服务失败");
-      document.body.classList.remove("ready");
-    };
-
-    requestAnimationFrame(frame);
-  </script>
-</body>
-</html>
-"""
-
-
-COUNTDOWN_HTML = """<!doctype html>
-<html lang="zh-CN">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Countdown</title>
-    <style>
-        :root {
-            color-scheme: dark;
-            --border: rgba(255, 255, 255, 0.18);
-            --text: #e7ebf1;
-            --muted: rgba(231, 235, 241, 0.76);
-        }
-        * {
-            box-sizing: border-box;
-        }
-        html, body {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            overflow: hidden;
-            background: rgba(0, 0, 0, 0.32);
-            color: var(--text);
-            font-family: "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
-        }
-        body {
-            display: flex;
-            align-items: stretch;
-            justify-content: center;
-        }
-        .shell {
-            width: 100%;
-            height: 100%;
-            display: grid;
-            grid-template-rows: auto 1fr;
-            border: 1px solid var(--border);
-            background: rgba(5, 7, 9, 0.28);
-        }
-        .title {
-            padding: 30px 24px;
-            text-align: center;
-            font-size: clamp(32px, 4vw, 64px);
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            border-bottom: 1px solid var(--border);
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            min-height: 0;
-        }
-        .cell {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 14px;
-            padding: 32px 12px 40px;
-        }
-        .value {
-            font-size: clamp(72px, 14vw, 204px);
-            line-height: 0.92;
-            font-weight: 500;
-            letter-spacing: 0.04em;
-            font-variant-numeric: tabular-nums;
-            color: #d9dde3;
-        }
-        .label {
-            font-size: clamp(24px, 3.1vw, 56px);
-            line-height: 1;
-            color: var(--muted);
-            letter-spacing: 0.06em;
-        }
-        body.invalid .grid,
-        body.expired .grid {
-            grid-template-columns: 1fr;
-        }
-        body.invalid .cell,
-        body.expired .cell {
-            gap: 22px;
-        }
-        body.invalid .value,
-        body.expired .value {
-            font-size: clamp(48px, 7vw, 110px);
-            letter-spacing: 0.02em;
-        }
-        body.invalid .label,
-        body.expired .label {
-            max-width: 900px;
-            font-size: clamp(18px, 2.1vw, 30px);
-            line-height: 1.5;
-            text-align: center;
-            letter-spacing: 0;
-        }
-        @media (max-width: 980px) {
-            .grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-            .cell {
-                min-height: 200px;
-            }
-        }
-        @media (max-width: 560px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
-            .title {
-                padding-top: 22px;
-                padding-bottom: 22px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <main class="shell">
-        <header class="title" id="name">倒数日</header>
-        <section class="grid" id="grid">
-            <div class="cell">
-                <div class="value" id="days">--</div>
-                <div class="label">天</div>
-            </div>
-            <div class="cell">
-                <div class="value" id="hours">--</div>
-                <div class="label">小时</div>
-            </div>
-            <div class="cell">
-                <div class="value" id="minutes">--</div>
-                <div class="label">分钟</div>
-            </div>
-            <div class="cell">
-                <div class="value" id="seconds">--</div>
-                <div class="label">秒</div>
-            </div>
-        </section>
-    </main>
-    <script>
-        const nameEl = document.getElementById("name");
-        const gridEl = document.getElementById("grid");
-        const fields = {
-            days: document.getElementById("days"),
-            hours: document.getElementById("hours"),
-            minutes: document.getElementById("minutes"),
-            seconds: document.getElementById("seconds"),
-        };
-
-        let countdown = null;
-        let targetMs = 0;
-
-        function pad(value) {
-            return String(Math.max(0, value)).padStart(2, "0");
-        }
-
-        function setNumbers(days, hours, minutes, seconds) {
-            fields.days.textContent = String(days);
-            fields.hours.textContent = pad(hours);
-            fields.minutes.textContent = pad(minutes);
-            fields.seconds.textContent = pad(seconds);
-        }
-
-        function setSinglePanel(value, label) {
-            gridEl.innerHTML = [
-                '<div class="cell">',
-                `<div class="value">${value}</div>`,
-                `<div class="label">${label}</div>`,
-                '</div>'
-            ].join("");
-        }
-
-        function ensureGrid() {
-            if (fields.days && gridEl.children.length === 4) {
-                return;
-            }
-            window.location.reload();
-        }
-
-        function applyPayload(payload) {
-            countdown = payload;
-            nameEl.textContent = payload.name || "倒数日";
-
-            if (!payload.ok) {
-                document.body.className = "invalid";
-                setSinglePanel("配置无效", payload.message || "请检查 COUNTDOWN_TARGET");
-                return;
-            }
-
-            ensureGrid();
-            targetMs = Date.parse((payload.target || "").replace(" ", "T"));
-            document.body.className = payload.expired ? "expired" : "";
-            render();
-        }
-
-        function render() {
-            if (!countdown || !countdown.ok) {
-                return;
-            }
-
-            const remainingMs = Math.max(0, targetMs - Date.now());
-            const remainingSeconds = Math.floor(remainingMs / 1000);
-            const days = Math.floor(remainingSeconds / 86400);
-            const hours = Math.floor((remainingSeconds % 86400) / 3600);
-            const minutes = Math.floor((remainingSeconds % 3600) / 60);
-            const seconds = remainingSeconds % 60;
-
-            if (remainingSeconds <= 0) {
-                document.body.className = "expired";
-                setSinglePanel("00:00", "时间已到");
-                return;
-            }
-
-            setNumbers(days, hours, minutes, seconds);
-            requestAnimationFrame(render);
-        }
-
-        async function refresh() {
-            try {
-                const response = await fetch("/api/countdown", { cache: "no-store" });
-                if (!response.ok) {
-                    throw new Error(await response.text());
-                }
-                applyPayload(await response.json());
-            } catch (error) {
-                document.body.className = "invalid";
-                setSinglePanel("连接失败", "无法加载倒数日数据");
-                console.error(error);
-            }
-        }
-
-        refresh();
-        setInterval(refresh, 15000);
-    </script>
-</body>
-</html>
-"""
-
-
 class Handler(BaseHTTPRequestHandler):
     server_version = "OBSLyrics/1.0"
 
@@ -1258,23 +734,24 @@ class Handler(BaseHTTPRequestHandler):
     def send_text(self, body: str, content_type: str, status: HTTPStatus = HTTPStatus.OK) -> None:
         self.send_bytes(body.encode("utf-8"), f"{content_type}; charset=utf-8", status)
 
+    def send_template(self, template_name: str) -> None:
+        body = TEMPLATES.get_template(template_name).render().encode("utf-8")
+        self.send_bytes(body, "text/html; charset=utf-8")
+
     def request_base_url(self) -> str:
         host = self.headers.get("Host") or f"{HOST}:{PORT}"
         return f"http://{host}"
 
-    def is_amll_player_port(self) -> bool:
-        return self.server.server_port == AMLL_PLAYER_PORT
-
     def do_GET(self) -> None:  # noqa: N802
         path = urllib.parse.urlparse(self.path).path
-        if path in {"/amll-player", "/player"} or (path == "/" and self.is_amll_player_port()):
-            self.send_bytes(AMLL_PLAYER_HTML.encode("utf-8"), "text/html; charset=utf-8")
+        if path in {"/amll", "/amll-player"}:
+            self.send_template("amll_player.html")
             return
         if path == "/countdown":
-            self.send_bytes(COUNTDOWN_HTML.encode("utf-8"), "text/html; charset=utf-8")
+            self.send_template("countdown.html")
             return
         if path in {"/", "/overlay"}:
-            self.send_bytes(OVERLAY_HTML.encode("utf-8"), "text/html; charset=utf-8")
+            self.send_template("overlay.html")
             return
         if path in {"/state", "/api/state"}:
             body = json.dumps(snapshot(), ensure_ascii=False).encode("utf-8")
@@ -1376,27 +853,20 @@ def main() -> None:
     thread = threading.Thread(target=poll_now_playing, daemon=True)
     thread.start()
 
-    servers = [ThreadingHTTPServer((HOST, PORT), Handler)]
-    if AMLL_PLAYER_PORT != PORT:
-        servers.append(ThreadingHTTPServer((HOST, AMLL_PLAYER_PORT), Handler))
-
+    server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"OBS Browser Source URL: http://{HOST}:{PORT}/")
-    print(f"AMLL Player URL: http://{HOST}:{AMLL_PLAYER_PORT}/")
+    print(f"AMLL Player URL: http://{HOST}:{PORT}/amll")
     print(f"State endpoint: http://{HOST}:{PORT}/state")
     print(f"Countdown endpoint: http://{HOST}:{PORT}/countdown")
     print(f"AMLL lines endpoint: http://{HOST}:{PORT}/amll/lines.json")
     print("Press Ctrl-C to stop.")
 
-    for background_server in servers[1:]:
-        threading.Thread(target=background_server.serve_forever, daemon=True).start()
-
     try:
-        servers[0].serve_forever()
+        server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
-        for server in servers:
-            server.server_close()
+        server.server_close()
 
 
 if __name__ == "__main__":

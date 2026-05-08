@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AMLL NetEase Lyrics</title>
+  <link rel="stylesheet" href="https://esm.sh/@applemusic-like-lyrics/core@0.4.2/style.css">
+  <style>
+    :root {
+      color-scheme: dark;
+      background: transparent;
+      --amll-lp-color: #d8f4ff;
+      --amll-lp-font-size: clamp(24px, 3.5vw, 58px);
+    }
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: rgba(8, 12, 18, 0.38);
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    }
+    #root {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+    #player {
+      position: absolute;
+      inset: 0;
+      padding: 4vh 5vw 6vh;
+      box-sizing: border-box;
+      text-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.9),
+        0 8px 22px rgba(0, 0, 0, 0.72);
+    }
+    #player :is(.KxF9Iq_lyricLine, .FmKaba_lyricLine) {
+      color: rgba(188, 222, 238, 0.86);
+      filter: none !important;
+      text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.92),
+        0 3px 10px rgba(0, 0, 0, 0.82),
+        0 0 14px rgba(132, 205, 238, 0.18);
+    }
+    #player :is(.KxF9Iq_lyricLine, .FmKaba_lyricLine):not(:is(.KxF9Iq_active, .FmKaba_active, .KxF9Iq_dirty, .FmKaba_dirty)) {
+      opacity: 0.74 !important;
+    }
+    #player :is(.KxF9Iq_active, .FmKaba_active) {
+      color: #e8f9ff;
+      opacity: 1 !important;
+      text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.95),
+        0 4px 14px rgba(0, 0, 0, 0.86),
+        0 0 20px rgba(130, 214, 255, 0.34);
+    }
+    #player :is(.KxF9Iq_lyricSubLine, .FmKaba_lyricSubLine) {
+      color: rgba(177, 215, 232, 0.82);
+      opacity: 0.78;
+      text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.92),
+        0 2px 8px rgba(0, 0, 0, 0.82);
+    }
+    #player > * {
+      width: 100%;
+      height: 100%;
+    }
+    #status {
+      position: absolute;
+      left: 5vw;
+      right: 5vw;
+      bottom: 4vh;
+      color: #b9e7ff;
+      font-size: clamp(18px, 2.3vw, 34px);
+      font-weight: 650;
+      text-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.9),
+        0 8px 22px rgba(0, 0, 0, 0.72);
+      opacity: 0.8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+    }
+    body.ready #status {
+      opacity: 0.42;
+    }
+  </style>
+</head>
+<body>
+  <main id="root">
+    <div id="player"></div>
+    <div id="status">正在加载 AMLL Player</div>
+  </main>
+  <script type="module">
+    import { LyricPlayer } from "https://esm.sh/@applemusic-like-lyrics/core@0.4.2?bundle";
+
+    const mount = document.getElementById("player");
+    const status = document.getElementById("status");
+    const player = new LyricPlayer();
+    mount.appendChild(player.getElement());
+
+    let loadedKey = "";
+    let baseElapsedMs = 0;
+    let basePerfMs = performance.now();
+    let playbackRate = 0;
+    let lastFrameMs = performance.now();
+
+    function currentTimeMs() {
+      return baseElapsedMs + (performance.now() - basePerfMs) * playbackRate;
+    }
+
+    function trackKey(state) {
+      const track = state.track || {};
+      if (!state.neteaseSongID && !track.title) {
+        return "";
+      }
+      return [
+        state.neteaseSongID || "",
+        track.title || "",
+        track.artist || "",
+        Math.round(track.duration || 0),
+      ].join("|");
+    }
+
+    function setStatus(text) {
+      status.textContent = text || "";
+    }
+
+    async function loadLines(key) {
+      const response = await fetch("/amll/lines.json", { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      const payload = await response.json();
+      player.setLyricLines(payload.lines || [], currentTimeMs());
+      loadedKey = key;
+      document.body.classList.toggle("ready", (payload.lines || []).length > 0);
+      setStatus(payload.track?.title ? `${payload.track.title} - ${payload.track.artist || ""}` : payload.message);
+    }
+
+    function applyState(state) {
+      const track = state.track || {};
+      baseElapsedMs = Math.max(0, (track.elapsed || 0) * 1000);
+      basePerfMs = performance.now();
+      playbackRate = track.playbackRate || 0;
+
+      const key = trackKey(state);
+      if (key && key !== loadedKey) {
+        loadLines(key).catch(error => {
+          console.error(error);
+          setStatus("AMLL 歌词加载失败");
+          document.body.classList.remove("ready");
+        });
+      } else if (!key) {
+        player.setLyricLines([], 0);
+        loadedKey = "";
+        setStatus(state.message || "等待网易云音乐播放");
+        document.body.classList.remove("ready");
+      }
+    }
+
+    function frame(now) {
+      const delta = now - lastFrameMs;
+      lastFrameMs = now;
+      player.setCurrentTime(currentTimeMs());
+      player.update(delta);
+      requestAnimationFrame(frame);
+    }
+
+    const events = new EventSource("/events");
+    events.onmessage = event => applyState(JSON.parse(event.data));
+    events.onerror = () => {
+      setStatus("连接本地歌词服务失败");
+      document.body.classList.remove("ready");
+    };
+
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
