@@ -9,8 +9,12 @@
 ## 启动
 
 ```bash
-uv run python server.py
+uv sync
+uv run server.py
 ```
+
+当前目录已经用 `uv init` 初始化成 `uv` 项目。
+这个服务目前只用 Python 标准库，所以暂时不需要执行 `uv add <package>`；后续如果引入第三方依赖，再用 `uv add` 添加即可。
 
 服务会直接调用系统 `swift now_playing.swift` 读取 Now Playing。这里刻意不编译成自定义二进制，因为当前 macOS 上自定义 `swiftc` 二进制读取 `MediaRemote.framework` 会返回空数据，而 Apple 自带 `swift` 解释执行可以正常返回网易云播放信息。
 
@@ -47,6 +51,43 @@ AMLL 滚动歌词 overlay：
 
 ```bash
 curl http://127.0.0.1:17363/state
+curl http://127.0.0.1:17363/api/countdown
+```
+
+## 倒数日 endpoint
+
+在 `config.py` 里设置：
+
+```python
+COUNTDOWN_NAME = "考研"
+COUNTDOWN_TARGET = "2026-12-19 00:00:00"
+```
+
+- `COUNTDOWN_NAME`：倒数日名称。
+- `COUNTDOWN_TARGET`：目标时间，支持 `YYYY-MM-DD` 或 `YYYY-MM-DD HH:MM:SS`。
+
+接口：
+
+```bash
+open http://127.0.0.1:17363/countdown
+curl http://127.0.0.1:17363/api/countdown
+```
+
+返回示例：
+
+```json
+{
+	"ok": true,
+	"name": "考研",
+	"target": "2026-12-19 00:00:00",
+	"expired": false,
+	"remainingSeconds": 19440000,
+	"days": 225,
+	"hours": 0,
+	"minutes": 0,
+	"seconds": 0,
+	"updatedAt": 1770000000.0
+}
 ```
 
 ## AMLL 适配
@@ -73,10 +114,10 @@ curl http://127.0.0.1:17363/amll/roman.lrc
 ## 可调环境变量
 
 ```bash
-OBS_LYRICS_PORT=17363 uv run python server.py
-AMLL_PLAYER_PORT=17364 uv run python server.py
-OBS_LYRICS_OFFSET=0.3 uv run python server.py
-OBS_LYRICS_SOURCE_BUNDLE=com.netease.163music uv run python server.py
+OBS_LYRICS_PORT=17363 uv run server.py
+AMLL_PLAYER_PORT=17364 uv run server.py
+OBS_LYRICS_OFFSET=0.3 uv run server.py
+OBS_LYRICS_SOURCE_BUNDLE=com.netease.163music uv run server.py
 ```
 
 - `OBS_LYRICS_OFFSET`：歌词整体偏移，单位秒。正数让歌词提前，负数让歌词延后。

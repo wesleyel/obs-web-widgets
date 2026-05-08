@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import bisect
+import datetime as dt
 import html
 import json
 import os
@@ -18,6 +19,12 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+
+try:
+    from config import COUNTDOWN_NAME, COUNTDOWN_TARGET
+except ImportError:
+    COUNTDOWN_NAME = ""
+    COUNTDOWN_TARGET = ""
 
 
 ROOT = Path(__file__).resolve().parent
@@ -352,6 +359,61 @@ def snapshot() -> dict[str, Any]:
         },
         "message": message,
         "error": error,
+        "updatedAt": time.time(),
+    }
+
+
+def parse_countdown_target(value: Any) -> dt.datetime | None:
+    if isinstance(value, dt.datetime):
+        if value.tzinfo is not None:
+            return value.astimezone().replace(tzinfo=None)
+        return value
+    if isinstance(value, dt.date):
+        return dt.datetime.combine(value, dt.time.min)
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        try:
+            parsed = dt.datetime.fromisoformat(raw)
+        except ValueError:
+            try:
+                parsed = dt.datetime.combine(dt.date.fromisoformat(raw), dt.time.min)
+            except ValueError:
+                return None
+        if parsed.tzinfo is not None:
+            return parsed.astimezone().replace(tzinfo=None)
+        return parsed
+    return None
+
+
+def countdown_snapshot() -> dict[str, Any]:
+    target = parse_countdown_target(COUNTDOWN_TARGET)
+    if target is None:
+        return {
+            "ok": False,
+            "name": str(COUNTDOWN_NAME or ""),
+            "target": str(COUNTDOWN_TARGET or ""),
+            "message": "倒数日配置无效，请检查 config.py 中的 COUNTDOWN_TARGET",
+            "updatedAt": time.time(),
+        }
+
+    now = dt.datetime.now()
+    remaining_seconds = max(0, int((target - now).total_seconds()))
+    days, remainder = divmod(remaining_seconds, 24 * 60 * 60)
+    hours, remainder = divmod(remainder, 60 * 60)
+    minutes, seconds = divmod(remainder, 60)
+
+    return {
+        "ok": True,
+        "name": str(COUNTDOWN_NAME or ""),
+        "target": target.isoformat(sep=" ", timespec="seconds"),
+        "expired": remaining_seconds == 0,
+        "remainingSeconds": remaining_seconds,
+        "days": days,
+        "hours": hours,
+        "minutes": minutes,
+        "seconds": seconds,
         "updatedAt": time.time(),
     }
 
@@ -943,6 +1005,241 @@ AMLL_PLAYER_HTML = """<!doctype html>
 """
 
 
+COUNTDOWN_HTML = """<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Countdown</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --border: rgba(255, 255, 255, 0.18);
+            --text: #e7ebf1;
+            --muted: rgba(231, 235, 241, 0.76);
+        }
+        * {
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.32);
+            color: var(--text);
+            font-family: "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+        }
+        body {
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+        }
+        .shell {
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-rows: auto 1fr;
+            border: 1px solid var(--border);
+            background: rgba(5, 7, 9, 0.28);
+        }
+        .title {
+            padding: 30px 24px;
+            text-align: center;
+            font-size: clamp(32px, 4vw, 64px);
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            border-bottom: 1px solid var(--border);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            min-height: 0;
+        }
+        .cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            padding: 32px 12px 40px;
+        }
+        .value {
+            font-size: clamp(72px, 14vw, 204px);
+            line-height: 0.92;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            font-variant-numeric: tabular-nums;
+            color: #d9dde3;
+        }
+        .label {
+            font-size: clamp(24px, 3.1vw, 56px);
+            line-height: 1;
+            color: var(--muted);
+            letter-spacing: 0.06em;
+        }
+        body.invalid .grid,
+        body.expired .grid {
+            grid-template-columns: 1fr;
+        }
+        body.invalid .cell,
+        body.expired .cell {
+            gap: 22px;
+        }
+        body.invalid .value,
+        body.expired .value {
+            font-size: clamp(48px, 7vw, 110px);
+            letter-spacing: 0.02em;
+        }
+        body.invalid .label,
+        body.expired .label {
+            max-width: 900px;
+            font-size: clamp(18px, 2.1vw, 30px);
+            line-height: 1.5;
+            text-align: center;
+            letter-spacing: 0;
+        }
+        @media (max-width: 980px) {
+            .grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .cell {
+                min-height: 200px;
+            }
+        }
+        @media (max-width: 560px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            .title {
+                padding-top: 22px;
+                padding-bottom: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <header class="title" id="name">倒数日</header>
+        <section class="grid" id="grid">
+            <div class="cell">
+                <div class="value" id="days">--</div>
+                <div class="label">天</div>
+            </div>
+            <div class="cell">
+                <div class="value" id="hours">--</div>
+                <div class="label">小时</div>
+            </div>
+            <div class="cell">
+                <div class="value" id="minutes">--</div>
+                <div class="label">分钟</div>
+            </div>
+            <div class="cell">
+                <div class="value" id="seconds">--</div>
+                <div class="label">秒</div>
+            </div>
+        </section>
+    </main>
+    <script>
+        const nameEl = document.getElementById("name");
+        const gridEl = document.getElementById("grid");
+        const fields = {
+            days: document.getElementById("days"),
+            hours: document.getElementById("hours"),
+            minutes: document.getElementById("minutes"),
+            seconds: document.getElementById("seconds"),
+        };
+
+        let countdown = null;
+        let targetMs = 0;
+
+        function pad(value) {
+            return String(Math.max(0, value)).padStart(2, "0");
+        }
+
+        function setNumbers(days, hours, minutes, seconds) {
+            fields.days.textContent = String(days);
+            fields.hours.textContent = pad(hours);
+            fields.minutes.textContent = pad(minutes);
+            fields.seconds.textContent = pad(seconds);
+        }
+
+        function setSinglePanel(value, label) {
+            gridEl.innerHTML = [
+                '<div class="cell">',
+                `<div class="value">${value}</div>`,
+                `<div class="label">${label}</div>`,
+                '</div>'
+            ].join("");
+        }
+
+        function ensureGrid() {
+            if (fields.days && gridEl.children.length === 4) {
+                return;
+            }
+            window.location.reload();
+        }
+
+        function applyPayload(payload) {
+            countdown = payload;
+            nameEl.textContent = payload.name || "倒数日";
+
+            if (!payload.ok) {
+                document.body.className = "invalid";
+                setSinglePanel("配置无效", payload.message || "请检查 COUNTDOWN_TARGET");
+                return;
+            }
+
+            ensureGrid();
+            targetMs = Date.parse((payload.target || "").replace(" ", "T"));
+            document.body.className = payload.expired ? "expired" : "";
+            render();
+        }
+
+        function render() {
+            if (!countdown || !countdown.ok) {
+                return;
+            }
+
+            const remainingMs = Math.max(0, targetMs - Date.now());
+            const remainingSeconds = Math.floor(remainingMs / 1000);
+            const days = Math.floor(remainingSeconds / 86400);
+            const hours = Math.floor((remainingSeconds % 86400) / 3600);
+            const minutes = Math.floor((remainingSeconds % 3600) / 60);
+            const seconds = remainingSeconds % 60;
+
+            if (remainingSeconds <= 0) {
+                document.body.className = "expired";
+                setSinglePanel("00:00", "时间已到");
+                return;
+            }
+
+            setNumbers(days, hours, minutes, seconds);
+            requestAnimationFrame(render);
+        }
+
+        async function refresh() {
+            try {
+                const response = await fetch("/api/countdown", { cache: "no-store" });
+                if (!response.ok) {
+                    throw new Error(await response.text());
+                }
+                applyPayload(await response.json());
+            } catch (error) {
+                document.body.className = "invalid";
+                setSinglePanel("连接失败", "无法加载倒数日数据");
+                console.error(error);
+            }
+        }
+
+        refresh();
+        setInterval(refresh, 15000);
+    </script>
+</body>
+</html>
+"""
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "OBSLyrics/1.0"
 
@@ -973,11 +1270,18 @@ class Handler(BaseHTTPRequestHandler):
         if path in {"/amll-player", "/player"} or (path == "/" and self.is_amll_player_port()):
             self.send_bytes(AMLL_PLAYER_HTML.encode("utf-8"), "text/html; charset=utf-8")
             return
+        if path == "/countdown":
+            self.send_bytes(COUNTDOWN_HTML.encode("utf-8"), "text/html; charset=utf-8")
+            return
         if path in {"/", "/overlay"}:
             self.send_bytes(OVERLAY_HTML.encode("utf-8"), "text/html; charset=utf-8")
             return
         if path in {"/state", "/api/state"}:
             body = json.dumps(snapshot(), ensure_ascii=False).encode("utf-8")
+            self.send_bytes(body, "application/json; charset=utf-8")
+            return
+        if path == "/api/countdown":
+            body = json.dumps(countdown_snapshot(), ensure_ascii=False).encode("utf-8")
             self.send_bytes(body, "application/json; charset=utf-8")
             return
         if path == "/amll/manifest.json":
@@ -1079,6 +1383,7 @@ def main() -> None:
     print(f"OBS Browser Source URL: http://{HOST}:{PORT}/")
     print(f"AMLL Player URL: http://{HOST}:{AMLL_PLAYER_PORT}/")
     print(f"State endpoint: http://{HOST}:{PORT}/state")
+    print(f"Countdown endpoint: http://{HOST}:{PORT}/countdown")
     print(f"AMLL lines endpoint: http://{HOST}:{PORT}/amll/lines.json")
     print("Press Ctrl-C to stop.")
 
