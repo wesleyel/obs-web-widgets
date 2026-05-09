@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>obs-web-widgets</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101114;
+      --panel: #1a1d22;
+      --panel-2: #20242b;
+      --border: #343943;
+      --text: #edf0f4;
+      --muted: #a8b0bd;
+      --accent: #69c0ff;
+      --ok: #70d99a;
+      --warn: #ffcf6a;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+    }
+    button,
+    input {
+      font: inherit;
+    }
+    button {
+      border: 1px solid var(--border);
+      background: #272d36;
+      color: var(--text);
+      min-height: 36px;
+      padding: 0 13px;
+      border-radius: 7px;
+      cursor: pointer;
+    }
+    button.primary {
+      border-color: #3c89b8;
+      background: #17648f;
+    }
+    main {
+      width: min(1120px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 34px 0 44px;
+    }
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+    .status {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #171a20;
+      white-space: nowrap;
+    }
+    .pill.ok { color: var(--ok); }
+    .pill.warn { color: var(--warn); }
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+    section {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    h2 {
+      margin: 0;
+      padding: 15px 18px;
+      border-bottom: 1px solid var(--border);
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+    .content {
+      padding: 18px;
+    }
+    .urls {
+      display: grid;
+      gap: 10px;
+    }
+    .url-row {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+    }
+    .url-row span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    code {
+      display: block;
+      min-height: 36px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: #11141a;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #d6e7f5;
+    }
+    form {
+      display: grid;
+      gap: 14px;
+    }
+    label {
+      display: grid;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    input {
+      width: 100%;
+      min-height: 38px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: #11141a;
+      color: var(--text);
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 4px;
+    }
+    .message {
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .switch-row input {
+      width: 22px;
+      min-height: 22px;
+    }
+    dl {
+      margin: 0;
+      display: grid;
+      grid-template-columns: 130px minmax(0, 1fr);
+      gap: 10px 12px;
+      font-size: 14px;
+    }
+    dt { color: var(--muted); }
+    dd {
+      margin: 0;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .wide {
+      grid-column: 1 / -1;
+    }
+    @media (max-width: 820px) {
+      main {
+        width: min(100vw - 22px, 1120px);
+        padding-top: 22px;
+      }
+      header {
+        align-items: stretch;
+        flex-direction: column;
+      }
+      .status {
+        justify-content: flex-start;
+      }
+      .layout {
+        grid-template-columns: 1fr;
+      }
+      .url-row {
+        grid-template-columns: 1fr auto;
+      }
+      .url-row span {
+        grid-column: 1 / -1;
+      }
+      dl {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>obs-web-widgets</h1>
+      <div class="status">
+        <span id="server-pill" class="pill">127.0.0.1:17363</span>
+        <span id="track-pill" class="pill">等待状态</span>
+        <span id="autostart-pill" class="pill">自启动未知</span>
+      </div>
+    </header>
+
+    <div class="layout">
+      <section>
+        <h2>OBS URLs</h2>
+        <div class="content urls" id="urls"></div>
+      </section>
+
+      <section>
+        <h2>配置</h2>
+        <div class="content">
+          <form id="config-form">
+            <label>
+              歌词偏移秒数
+              <input name="lyricOffset" type="number" step="0.05" inputmode="decimal">
+            </label>
+            <label>
+              Now Playing Bundle ID
+              <input name="nowPlayingBundleID" autocomplete="off">
+            </label>
+            <label>
+              轮询间隔秒数
+              <input name="pollInterval" type="number" min="0.1" max="60" step="0.1" inputmode="decimal">
+            </label>
+            <label>
+              倒数日名称
+              <input name="countdownName" autocomplete="off">
+            </label>
+            <label>
+              倒数日目标时间
+              <input name="countdownTarget" autocomplete="off" placeholder="2026-12-20 00:00:00">
+            </label>
+            <div class="actions">
+              <button class="primary" type="submit">保存</button>
+              <span class="message" id="save-message"></span>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section>
+        <h2>当前状态</h2>
+        <div class="content">
+          <dl>
+            <dt>曲目</dt><dd id="track-title">-</dd>
+            <dt>歌手</dt><dd id="track-artist">-</dd>
+            <dt>歌词</dt><dd id="lyric-current">-</dd>
+            <dt>倒数日</dt><dd id="countdown-current">-</dd>
+            <dt>配置文件</dt><dd id="config-path">-</dd>
+          </dl>
+        </div>
+      </section>
+
+      <section>
+        <h2>开机自启动</h2>
+        <div class="content">
+          <div class="switch-row">
+            <label>
+              LaunchAgent
+              <input id="autostart-toggle" type="checkbox">
+            </label>
+            <button id="autostart-refresh" type="button">刷新</button>
+          </div>
+          <div class="message" id="autostart-message"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const form = document.getElementById("config-form");
+    const urls = document.getElementById("urls");
+    const saveMessage = document.getElementById("save-message");
+    const autostartToggle = document.getElementById("autostart-toggle");
+    const autostartMessage = document.getElementById("autostart-message");
+    const autostartPill = document.getElementById("autostart-pill");
+    const serverPill = document.getElementById("server-pill");
+    const trackPill = document.getElementById("track-pill");
+
+    const fields = {
+      trackTitle: document.getElementById("track-title"),
+      trackArtist: document.getElementById("track-artist"),
+      lyricCurrent: document.getElementById("lyric-current"),
+      countdownCurrent: document.getElementById("countdown-current"),
+      configPath: document.getElementById("config-path"),
+    };
+
+    function setText(node, value) {
+      node.textContent = value || "-";
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, { cache: "no-store", ...options });
+      if (!response.ok) throw new Error(await response.text());
+      return response.json();
+    }
+
+    function renderUrls(baseURL) {
+      const items = [
+        ["歌词", `${baseURL}/lyrics`],
+        ["AMLL", `${baseURL}/amll`],
+        ["倒数日", `${baseURL}/countdown`],
+      ];
+      urls.innerHTML = items.map(([label, value]) => `
+        <div class="url-row">
+          <span>${label}</span>
+          <code>${value}</code>
+          <button type="button" data-copy="${value}">复制</button>
+        </div>
+      `).join("");
+    }
+
+    async function loadConfig() {
+      const payload = await api("/api/config");
+      const config = payload.config || {};
+      form.lyricOffset.value = config.lyricOffset ?? 0;
+      form.nowPlayingBundleID.value = config.nowPlayingBundleID || "";
+      form.pollInterval.value = config.pollInterval ?? 0.6;
+      form.countdownName.value = config.countdownName || "";
+      form.countdownTarget.value = config.countdownTarget || "";
+      serverPill.textContent = `${payload.server.host}:${payload.server.port}`;
+      setText(fields.configPath, payload.configPath);
+      renderUrls(payload.server.baseURL);
+    }
+
+    async function loadState() {
+      const [state, countdown] = await Promise.all([
+        api("/api/state"),
+        api("/api/countdown"),
+      ]);
+      const track = state.track || {};
+      setText(fields.trackTitle, track.title);
+      setText(fields.trackArtist, track.artist);
+      setText(fields.lyricCurrent, state.lyric?.current || state.message);
+      setText(fields.countdownCurrent, countdown.ok ? `${countdown.days} 天 ${countdown.hours} 小时` : countdown.message);
+      trackPill.className = state.ok ? "pill ok" : "pill warn";
+      trackPill.textContent = state.ok ? "Now Playing 已连接" : "等待 Now Playing";
+    }
+
+    async function loadAutostart() {
+      const payload = await api("/api/autostart");
+      autostartToggle.checked = Boolean(payload.enabled);
+      autostartPill.className = payload.enabled ? "pill ok" : "pill";
+      autostartPill.textContent = payload.enabled ? "自启动已开启" : "自启动关闭";
+      autostartMessage.textContent = payload.plistPath || "";
+    }
+
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      saveMessage.textContent = "保存中";
+      const payload = Object.fromEntries(new FormData(form).entries());
+      payload.lyricOffset = Number(payload.lyricOffset || 0);
+      payload.pollInterval = Number(payload.pollInterval || 0.6);
+      try {
+        await api("/api/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        saveMessage.textContent = "已保存";
+        await loadConfig();
+        await loadState();
+      } catch (error) {
+        saveMessage.textContent = "保存失败";
+        console.error(error);
+      }
+    });
+
+    urls.addEventListener("click", async event => {
+      const button = event.target.closest("button[data-copy]");
+      if (!button) return;
+      await navigator.clipboard.writeText(button.dataset.copy);
+      button.textContent = "已复制";
+      setTimeout(() => { button.textContent = "复制"; }, 1200);
+    });
+
+    autostartToggle.addEventListener("change", async () => {
+      try {
+        const payload = await api("/api/autostart", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled: autostartToggle.checked }),
+        });
+        autostartToggle.checked = Boolean(payload.enabled);
+        await loadAutostart();
+      } catch (error) {
+        autostartToggle.checked = !autostartToggle.checked;
+        autostartMessage.textContent = "更新失败";
+        console.error(error);
+      }
+    });
+
+    document.getElementById("autostart-refresh").addEventListener("click", loadAutostart);
+
+    Promise.all([loadConfig(), loadState(), loadAutostart()]).catch(console.error);
+    setInterval(() => loadState().catch(console.error), 2500);
+  </script>
+</body>
+</html>

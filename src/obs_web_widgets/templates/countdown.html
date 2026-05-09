@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Countdown</title>
+    <title>obs-web-widgets Countdown</title>
     <style>
         :root {
             color-scheme: dark;
@@ -41,7 +41,7 @@
             text-align: center;
             font-size: clamp(32px, 4vw, 64px);
             font-weight: 700;
-            letter-spacing: 0.08em;
+            letter-spacing: 0;
             border-bottom: 1px solid var(--border);
         }
         .grid {
@@ -61,7 +61,7 @@
             font-size: clamp(72px, 14vw, 204px);
             line-height: 0.92;
             font-weight: 500;
-            letter-spacing: 0.04em;
+            letter-spacing: 0;
             font-variant-numeric: tabular-nums;
             color: #d9dde3;
         }
@@ -69,7 +69,7 @@
             font-size: clamp(24px, 3.1vw, 56px);
             line-height: 1;
             color: var(--muted);
-            letter-spacing: 0.06em;
+            letter-spacing: 0;
         }
         body.invalid .grid,
         body.expired .grid {
@@ -82,7 +82,7 @@
         body.invalid .value,
         body.expired .value {
             font-size: clamp(48px, 7vw, 110px);
-            letter-spacing: 0.02em;
+            letter-spacing: 0;
         }
         body.invalid .label,
         body.expired .label {
@@ -179,7 +179,7 @@
 
             if (!payload.ok) {
                 document.body.className = "invalid";
-                setSinglePanel("配置无效", payload.message || "请检查 COUNTDOWN_TARGET");
+                setSinglePanel("配置无效", payload.message || "请检查倒数日目标时间");
                 return;
             }
 

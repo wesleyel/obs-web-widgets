@@ -1,7 +1,46 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "webendpoint-obs"
+name = "obs-web-widgets"
 version = "0.1.0"
+description = "macOS-only local web widgets for OBS Browser Source"
+readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "jinja2>=3.1.6",
+license = "MIT"
+authors = [{ name = "obs-web-widgets contributors" }]
+keywords = ["obs", "lyrics", "amll", "countdown", "macos"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: MacOS X",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio",
 ]
+dependencies = []
+
+[project.scripts]
+obs-web-widgets = "obs_web_widgets.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+    "ruff>=0.11.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+obs_web_widgets = ["templates/*.html", "resources/*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["RUF001"]

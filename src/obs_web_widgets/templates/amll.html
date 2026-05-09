@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AMLL NetEase Lyrics</title>
+  <title>obs-web-widgets AMLL</title>
   <link rel="stylesheet" href="https://esm.sh/@applemusic-like-lyrics/core@0.4.2/style.css">
   <style>
     :root {
@@ -131,7 +131,7 @@
     }
 
     async function loadLines(key) {
-      const response = await fetch("/amll/lines.json", { cache: "no-store" });
+      const response = await fetch("/api/amll/lines", { cache: "no-store" });
       if (!response.ok) {
         throw new Error(await response.text());
       }

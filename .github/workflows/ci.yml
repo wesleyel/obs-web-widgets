@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint, test, and build
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Test
+        run: uv run pytest
+
+      - name: Build Python package
+        run: uv build
+
+      - name: Verify package resources
+        run: |
+          uv run python - <<'PY'
+          from importlib.resources import files
+          from obs_web_widgets.now_playing import now_playing_swift_path
+
+          assert files("obs_web_widgets").joinpath("templates", "config.html").is_file()
+          assert files("obs_web_widgets").joinpath("templates", "lyrics.html").is_file()
+          assert files("obs_web_widgets").joinpath("templates", "amll.html").is_file()
+          assert files("obs_web_widgets").joinpath("templates", "countdown.html").is_file()
+          assert now_playing_swift_path().endswith("now_playing.swift")
+          PY
+
+      - name: Upload tagged artifacts
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: obs-web-widgets-python-dist
+          path: dist/*

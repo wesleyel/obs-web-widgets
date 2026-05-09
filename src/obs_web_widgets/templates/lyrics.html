@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NetEase Lyrics Overlay</title>
+  <title>obs-web-widgets Lyrics</title>
   <style>
     :root {
       color-scheme: dark;
@@ -93,7 +93,7 @@
     events.onmessage = event => render(JSON.parse(event.data));
     events.onerror = () => {
       setText(track, "连接本地歌词服务失败");
-      setText(current, "检查 server.py 是否仍在运行");
+      setText(current, "检查 obs-web-widgets 是否仍在运行");
       setText(next, "");
     };
   </script>

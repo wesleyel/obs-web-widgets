@@ -1,133 +1,101 @@
-# OBS 网易云歌词 Web Endpoint
+# obs-web-widgets
 
-这个目录是一套本机小服务：
+macOS-only local web widgets for OBS Browser Source.
 
-1. `now_playing.swift` 读取 macOS 系统级 Now Playing 元数据，拿到网易云音乐当前播放的歌名、歌手、时长、进度。
-2. `server.py` 用“歌名 + 歌手”搜索网易云歌曲 ID，拉取 LRC 歌词。
-3. OBS 添加 Browser Source，加载本地页面，页面通过 SSE 实时收到当前歌词行。
+The CLI starts one localhost service at `127.0.0.1:17363` and serves:
 
-## 启动
+- `/config`: local configuration page
+- `/lyrics`: simple lyrics overlay
+- `/amll`: Apple Music-like Lyrics widget
+- `/countdown`: countdown widget
+
+Now Playing metadata is read through macOS `MediaRemote.framework` by running the bundled
+`now_playing.swift` with the system `swift` command.
+
+## Install
+
+Development checkout:
 
 ```bash
 uv sync
-uv run server.py
+uv run obs-web-widgets --open
 ```
 
-当前目录已经用 `uv init` 初始化成 `uv` 项目。
-这个服务目前只用 Python 标准库，所以暂时不需要执行 `uv add <package>`；后续如果引入第三方依赖，再用 `uv add` 添加即可。
-
-服务会直接调用系统 `swift now_playing.swift` 读取 Now Playing。这里刻意不编译成自定义二进制，因为当前 macOS 上自定义 `swiftc` 二进制读取 `MediaRemote.framework` 会返回空数据，而 Apple 自带 `swift` 解释执行可以正常返回网易云播放信息。
-
-当前目录也提供了一个临时 LaunchAgent：
+Homebrew distribution target:
 
 ```bash
-launchctl bootstrap gui/$(id -u) ./local.webendpoint.obs.amll.plist
-launchctl bootout gui/$(id -u) ./local.webendpoint.obs.amll.plist
+brew install <tap>/obs-web-widgets
+obs-web-widgets --open
 ```
 
-日志写到 `/tmp/webendpoint-obs.log`。
+For a Homebrew service, the formula should run `obs-web-widgets` directly and keep the service alive.
+The in-app autostart switch writes `~/Library/LaunchAgents/local.obs-web-widgets.plist` pointing to
+the currently running CLI executable.
 
-## OBS 设置
+## OBS URLs
 
-旧版简单 overlay：
+Add Browser Source entries in OBS:
 
-在 OBS 里添加：
+```text
+http://127.0.0.1:17363/lyrics
+http://127.0.0.1:17363/amll
+http://127.0.0.1:17363/countdown
+```
 
-- 来源类型：Browser
-- URL：`http://127.0.0.1:17363/`
-- Width：`1920`
-- Height：`360`
-- 背景：页面本身是透明背景
+The pages use transparent-friendly dark overlays. AMLL loads
+`@applemusic-like-lyrics/core@0.4.2` from `esm.sh`, so that OBS source needs network access.
 
-AMLL 滚动歌词 overlay：
+## Configuration
 
-- 来源类型：Browser
-- URL：`http://127.0.0.1:17364/`
-- Width：`1920`
-- Height：`1080`
-- 背景：页面本身是透明背景
+Configuration is stored at:
 
-如果你只想调试接口：
+```text
+~/Library/Application Support/obs-web-widgets/config.json
+```
+
+Fields:
+
+- `lyricOffset`: lyrics offset in seconds
+- `nowPlayingBundleID`: target Now Playing app bundle id, default `com.netease.163music`
+- `pollInterval`: Now Playing polling interval in seconds
+- `countdownName`: countdown title
+- `countdownTarget`: `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`
+
+CLI options:
 
 ```bash
-curl http://127.0.0.1:17363/state
-curl http://127.0.0.1:17363/api/countdown
+obs-web-widgets --host 127.0.0.1 --port 17363
+obs-web-widgets --config ~/Library/Application\ Support/obs-web-widgets/config.json
+obs-web-widgets --open
 ```
 
-## 倒数日 endpoint
+## API
 
-在 `config.py` 里设置：
+Supported endpoints:
 
-```python
-COUNTDOWN_NAME = "考研"
-COUNTDOWN_TARGET = "2026-12-19 00:00:00"
+```text
+GET  /api/state
+GET  /api/countdown
+GET  /api/amll/lines
+GET  /api/config
+POST /api/config
+GET  /api/autostart
+POST /api/autostart
+GET  /events
 ```
 
-- `COUNTDOWN_NAME`：倒数日名称。
-- `COUNTDOWN_TARGET`：目标时间，支持 `YYYY-MM-DD` 或 `YYYY-MM-DD HH:MM:SS`。
+`POST /api/config` accepts JSON using the same field names as the config file.
+`POST /api/autostart` accepts `{"enabled": true}` or `{"enabled": false}`.
 
-接口：
+## Development
 
 ```bash
-open http://127.0.0.1:17363/countdown
-curl http://127.0.0.1:17363/api/countdown
+uv sync --all-groups
+uv run ruff check .
+uv run pytest
+uv build
 ```
 
-返回示例：
-
-```json
-{
-	"ok": true,
-	"name": "考研",
-	"target": "2026-12-19 00:00:00",
-	"expired": false,
-	"remainingSeconds": 19440000,
-	"days": 225,
-	"hours": 0,
-	"minutes": 0,
-	"seconds": 0,
-	"updatedAt": 1770000000.0
-}
-```
-
-## AMLL 适配
-
-AMLL 相关 endpoint：
-
-```bash
-curl http://127.0.0.1:17363/amll/manifest.json
-curl http://127.0.0.1:17363/amll/lyrics.lrc
-curl http://127.0.0.1:17363/amll/lyrics.ttml
-curl http://127.0.0.1:17363/amll/lyrics.yrc
-curl http://127.0.0.1:17363/amll/lines.json
-curl http://127.0.0.1:17363/amll/translation.lrc
-curl http://127.0.0.1:17363/amll/roman.lrc
-```
-
-- `manifest.json`：当前曲目、网易云 song ID、可用歌词格式 URL。
-- `lyrics.lrc`：AMLL 支持的普通 LRC，保留网易云原始 LRC 并补 `ti/ar/al/length/netease` 元数据。
-- `lyrics.ttml`：按 AMLL TTML 约定生成的行级 TTML，`itunes:timing="Line"`。
-- `lyrics.yrc`：网易云返回 YRC 逐字歌词时才可用；当前歌曲没有 YRC 时返回 404。
-- `lines.json`：AMLL core `LyricPlayer.setLyricLines()` 可直接消费的 `LyricLine[]`。
-- `translation.lrc` / `roman.lrc`：网易云返回翻译或音译时才可用；TTML 会自动把这些挂到 `x-translation` / `x-roman`。
-
-## 可调环境变量
-
-```bash
-OBS_LYRICS_PORT=17363 uv run server.py
-AMLL_PLAYER_PORT=17364 uv run server.py
-OBS_LYRICS_OFFSET=0.3 uv run server.py
-OBS_LYRICS_SOURCE_BUNDLE=com.netease.163music uv run server.py
-```
-
-- `OBS_LYRICS_OFFSET`：歌词整体偏移，单位秒。正数让歌词提前，负数让歌词延后。
-- `OBS_LYRICS_SOURCE_BUNDLE`：默认只接受网易云 `com.netease.163music` 的 Now Playing 数据。
-
-## 兼容性变更
-
-- 这套方案只支持 macOS，因为当前播放信息来自 macOS 私有 `MediaRemote.framework`。
-- 不接 obs-websocket；OBS 端只需要 Browser Source。
-- 服务会同时监听两个端口：`17363` 保留简单 overlay/API，`17364` 展示 AMLL Player 滚动歌词。
-- 网易云歌词接口是非官方接口，接口变更或版权限制时可能只能显示“暂无歌词”。
-- AMLL 的 TTML 适配是行级 TTML；只有网易云接口实际返回 YRC 时才会提供逐字歌词。
-- AMLL Player 页面从 `esm.sh` 加载 `@applemusic-like-lyrics/core@0.4.2`，OBS Browser Source 需要能访问该 CDN。
+CI runs lint, tests, and Python package build on macOS. Tagged builds upload the Python
+distribution artifacts from `dist/`; no `.app`, PyInstaller bundle, code signing, or notarization
+is part of this project.
