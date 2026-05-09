@@ -9,6 +9,7 @@ description = "macOS-only local web widgets for OBS Browser Source"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 authors = [{ name = "obs-web-widgets contributors" }]
 keywords = ["obs", "lyrics", "amll", "countdown", "macos"]
 classifiers = [

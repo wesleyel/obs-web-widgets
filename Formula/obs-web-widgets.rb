@@ -9,6 +9,7 @@ class ObsWebWidgets < Formula
   head "https://github.com/wesleyel/obs-web-widgets.git", branch: "main"
 
   depends_on "python@3.12"
+  uses_from_macos "perl"
 
   resource "setuptools" do
     url "https://files.pythonhosted.org/packages/4f/db/cfac1baf10650ab4d1c111714410d2fbb77ac5a616db26775db562c8fab2/setuptools-82.0.1.tar.gz"

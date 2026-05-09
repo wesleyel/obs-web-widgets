@@ -62,13 +62,13 @@ jobs:
         run: |
           uv run python - <<'PY'
           from importlib.resources import files
-          from obs_web_widgets.now_playing import now_playing_swift_path
+          from obs_web_widgets.now_playing import now_playing_adapter_archive_path
 
           assert files("obs_web_widgets").joinpath("templates", "config.html").is_file()
           assert files("obs_web_widgets").joinpath("templates", "lyrics.html").is_file()
           assert files("obs_web_widgets").joinpath("templates", "amll.html").is_file()
           assert files("obs_web_widgets").joinpath("templates", "countdown.html").is_file()
-          assert now_playing_swift_path().endswith("now_playing.swift")
+          assert now_playing_adapter_archive_path().endswith("mediaremote-adapter.tar.gz")
           PY
 
       - name: Upload tagged artifacts

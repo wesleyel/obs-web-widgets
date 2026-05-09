@@ -22,8 +22,8 @@ The CLI starts one localhost service at `127.0.0.1:17363` and serves:
 - `/amll`: Apple Music-like Lyrics widget
 - `/countdown`: countdown widget
 
-Now Playing metadata is read through macOS `MediaRemote.framework` by running the bundled
-`now_playing.swift` with the system `swift` command.
+Now Playing metadata is read through a bundled `mediaremote-adapter` Perl bridge that loads
+macOS `MediaRemote.framework`.
 
 ## Install
 
@@ -65,8 +65,7 @@ The in-app autostart switch writes `~/Library/LaunchAgents/local.obs-web-widgets
 the currently running CLI executable. Homebrew Services instead uses the service block in
 `Formula/obs-web-widgets.rb`.
 
-Now Playing requires the system `swift` command. Install Apple's Command Line Tools or Xcode if
-`swift --version` is unavailable.
+Now Playing requires the system `perl` command, available at `/usr/bin/perl` on macOS.
 
 ## OBS URLs
 
