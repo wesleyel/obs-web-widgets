@@ -36,6 +36,28 @@ jobs:
       - name: Build Python package
         run: uv build
 
+      - name: Verify Homebrew formula
+        run: |
+          ruby -c Formula/obs-web-widgets.rb
+          brew style Formula/obs-web-widgets.rb
+          uv run python - <<'PY'
+          import re
+          import tomllib
+          from pathlib import Path
+
+          project = tomllib.loads(Path("pyproject.toml").read_text())
+          formula = Path("Formula/obs-web-widgets.rb").read_text()
+          expected = project["project"]["version"]
+
+          version = re.search(r'^  version "([^"]+)"$', formula, re.MULTILINE)
+          tag = re.search(r'tag:\s+"v([^"]+)"', formula)
+
+          assert version, "Formula version is missing"
+          assert tag, "Formula tag is missing"
+          assert version.group(1) == expected
+          assert tag.group(1) == expected
+          PY
+
       - name: Verify package resources
         run: |
           uv run python - <<'PY'
