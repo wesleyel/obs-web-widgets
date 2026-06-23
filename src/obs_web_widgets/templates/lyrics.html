@@ -82,6 +82,14 @@
     function render(state) {
       const title = state.track?.title || "";
       const artist = state.track?.artist || "";
+      const appBundleID = state.track?.appBundleID || "";
+      const isNetease = appBundleID === "com.netease.163music";
+      if (!isNetease) {
+        setText(track, "");
+        setText(current, "");
+        setText(next, "");
+        return;
+      }
       const trackText = [title, artist].filter(Boolean).join(" - ");
       setText(track, trackText || state.message || "等待网易云音乐播放");
       track.classList.toggle("dim", !trackText);

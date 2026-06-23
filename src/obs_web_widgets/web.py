@@ -119,8 +119,8 @@ class WidgetRuntime:
             app_bundle = str(track.get("appBundleID") or "")
             if config.now_playing_bundle_id and app_bundle and app_bundle != config.now_playing_bundle_id:
                 with self.state_lock:
-                    self.now_playing = track
-                    self.lyric_bundle = empty_bundle(f"当前 Now Playing 来源不是目标应用: {app_bundle}")
+                    self.now_playing = {}
+                    self.lyric_bundle = empty_bundle("")
                     self.last_error = ""
                     self.lyrics_track_key = ""
                 return

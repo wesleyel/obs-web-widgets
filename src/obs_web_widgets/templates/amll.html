@@ -144,6 +144,17 @@
 
     function applyState(state) {
       const track = state.track || {};
+      const appBundleID = track.appBundleID || "";
+      const isNetease = appBundleID === "com.netease.163music";
+
+      if (!isNetease) {
+        player.setLyricLines([], 0);
+        loadedKey = "";
+        setStatus("");
+        document.body.classList.remove("ready");
+        return;
+      }
+
       baseElapsedMs = Math.max(0, (track.elapsed || 0) * 1000);
       basePerfMs = performance.now();
       playbackRate = track.playbackRate || 0;
